@@ -1,48 +1,92 @@
-# App Store Payments CLI
+# App Store Earnings CLI
 
-A local CLI tool to view your App Store earnings by month. Replaces the need for services like appFigures for basic earnings tracking.
+A free, open-source CLI tool to view your App Store earnings by month. A simple alternative to paid services like appFigures for basic earnings tracking.
 
 ## Features
 
-- View monthly earnings per app in a clean table format
-- Converts all currencies to SGD (Singapore Dollars)
-- Uses Apple's fiscal calendar for accurate monthly breakdowns
+- View monthly earnings in a clean tree format (apps with their IAPs grouped together)
+- Configurable target currency (USD, EUR, GBP, SGD, etc.)
+- Automatic currency conversion using ECB exchange rates
+- Groups In-App Purchases and subscriptions under their parent apps
 - Caches reports locally to avoid repeated API calls
-- Shows the last 24 fiscal months for selection
+- Shows the last 24 months for selection
+
+## Example Output
+
+```
+  App Store Earnings CLI
+
+? Select month: September 2025
+
+Fetching financial report for September 2025...
+Converting currencies to USD...
+
+  Earnings for September 2025
+
+├── My Awesome App                          $128.45
+│   ├── Pro Upgrade                          $89.99
+│   ├── Premium Features                     $28.50
+│   └── Remove Ads                            $9.96
+│
+├── Photo Editor Pro                         $67.22
+│   ├── Monthly Subscription                 $45.00
+│   └── Yearly Subscription                  $22.22
+│
+└── Simple Utility                           $12.99
+    └── (App Sales)                          $12.99
+
+─────────────────────────────────────────────────────
+                                  TOTAL      $208.66
+```
 
 ## Prerequisites
 
 - Node.js 18.0.0 or higher
-- yarn
+- yarn or npm
 - An Apple Developer account with apps on the App Store
-- App Store Connect API access (Account Holder or Admin role)
+- App Store Connect API access (requires Account Holder or Admin role)
 
 ## Setup
 
 ### 1. Clone and install dependencies
 
 ```bash
-cd app-store-payments
+git clone https://github.com/tzechuen/appstore-earnings-cli.git
+cd appstore-earnings-cli
 yarn install
 ```
 
-### 2. Create an App Store Connect API Key
+### 2. Create App Store Connect API Keys
+
+You need **one required key** and **one optional key**:
+
+#### Required: Finance API Key
+
+This key is used to download financial reports.
 
 1. Go to [App Store Connect](https://appstoreconnect.apple.com)
 2. Navigate to **Users and Access** > **Integrations** > **App Store Connect API**
-3. Click the **+** button to generate a new API key
-4. Name it something like "Earnings CLI"
-5. Select **Finance** or **Admin** access level
+3. Click **+** to generate a new API key
+4. Name it something like "Earnings CLI - Finance"
+5. Select **Finance** access level
 6. Click **Generate**
-7. **Important**: Download the `.p8` file immediately - you can only download it once!
-8. Note the **Key ID** (shown in the table)
-9. Note the **Issuer ID** (shown at the top of the page)
+7. **Download the `.p8` file immediately** - you can only download it once!
+8. Note the **Key ID** and **Issuer ID**
+
+#### Optional: App Manager API Key
+
+This key enables grouping of In-App Purchases under their parent apps. Without it, earnings are shown as a flat list.
+
+1. Create another API key following the same steps
+2. Name it "Earnings CLI - App Manager"
+3. Select **App Manager** access level (or **Admin** if you prefer)
+4. Download and save the `.p8` file separately
 
 ### 3. Find your Vendor Number
 
 1. In App Store Connect, go to **Payments and Financial Reports**
 2. Click on **Payments** or **Financial Reports**
-3. Your Vendor Number is displayed in the top-right area (it's a numeric ID)
+3. Your Vendor Number is displayed in the top-right area (it's a numeric ID like `12345678`)
 
 ### 4. Configure the CLI
 
@@ -51,17 +95,26 @@ yarn install
    cp .env.example .env
    ```
 
-2. Move your `.p8` file to the project directory:
+2. Move your `.p8` files to the project directory:
    ```bash
    mv ~/Downloads/AuthKey_XXXXXXXXXX.p8 ./
    ```
 
 3. Edit `.env` with your credentials:
    ```bash
+   # Required: Finance API Key
    ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
    ASC_KEY_ID=XXXXXXXXXX
    ASC_PRIVATE_KEY_PATH=./AuthKey_XXXXXXXXXX.p8
    ASC_VENDOR_NUMBER=12345678
+
+   # Optional: App Manager API Key (for grouping IAPs under apps)
+   ASC_APP_MANAGER_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   ASC_APP_MANAGER_KEY_ID=YYYYYYYYYY
+   ASC_APP_MANAGER_PRIVATE_KEY_PATH=./AuthKey_YYYYYYYYYY.p8
+
+   # Optional: Target currency (default: USD)
+   TARGET_CURRENCY=USD
    ```
 
 ## Usage
@@ -73,72 +126,70 @@ yarn start
 ```
 
 This will:
-1. Show an interactive menu to select a fiscal month
-2. Download (or use cached) sales report for that month
-3. Convert all proceeds to SGD
-4. Display a table of earnings per app
+1. Show an interactive menu to select a month
+2. Download (or use cached) financial report for that month
+3. Convert all proceeds to your target currency
+4. Display earnings grouped by app
 
-### Bypass cache
-
-To force re-download a report (e.g., if data was updated):
+### CLI Options
 
 ```bash
-yarn start:no-cache
+# Bypass cache and re-download the report
+yarn start --no-cache
+
+# Refresh the app/IAP mapping cache
+yarn start --refresh-mapping
+
+# Enable debug output
+DEBUG=1 yarn start
 ```
 
-### Example output
+### Changing the target currency
 
+Set the `TARGET_CURRENCY` environment variable in your `.env` file:
+
+```bash
+TARGET_CURRENCY=EUR   # Euros
+TARGET_CURRENCY=GBP   # British Pounds
+TARGET_CURRENCY=SGD   # Singapore Dollars
+TARGET_CURRENCY=JPY   # Japanese Yen
 ```
-  App Store Earnings CLI
 
-? Select fiscal month: December 2024 (Nov 25 - Dec 29)
-
-Fetching report for December 2024 (Nov 25 - Dec 29)...
-Converting currencies to SGD...
-
-  Earnings for December 2024 (Nov 25 - Dec 29)
-
-┌────────────────────────────────────────┬──────────────────┐
-│ App                                    │ Proceeds (SGD)   │
-├────────────────────────────────────────┼──────────────────┤
-│ My Awesome App                         │ S$328.45         │
-│ Another Great App                      │ S$119.22         │
-│ Simple Utility                         │ S$16.80          │
-├────────────────────────────────────────┼──────────────────┤
-│                                        │                  │
-├────────────────────────────────────────┼──────────────────┤
-│                                  TOTAL │         S$464.47 │
-└────────────────────────────────────────┴──────────────────┘
-```
+Supported currencies include: USD, EUR, GBP, SGD, JPY, AUD, CAD, CHF, CNY, HKD, NZD, SEK, KRW, MXN, INR, BRL, and more.
 
 ## How It Works
 
 ### Data Source
 
-The CLI uses Apple's [App Store Connect API](https://developer.apple.com/documentation/appstoreconnectapi) to download **Summary Sales Reports**. These reports contain:
+The CLI uses Apple's [App Store Connect API](https://developer.apple.com/documentation/appstoreconnectapi) to download **Financial Reports**. These reports contain actual payment amounts that match what Apple deposits to your bank account.
 
-- Units sold/returned per app
-- Developer proceeds (your earnings after Apple's commission)
-- Currency of proceeds
-- Product type (app, in-app purchase, subscription, etc.)
+### Two API Keys Explained
 
-### Fiscal Calendar
+Apple's API requires different access levels for different endpoints:
 
-Apple uses a fiscal calendar that doesn't align with regular calendar months. Each fiscal month is either 4 or 5 weeks, starting on a Sunday. The CLI calculates these dates automatically and shows them in the month picker.
+| Endpoint | Required Role | Purpose |
+|----------|---------------|---------|
+| Financial Reports | Finance | Download monthly earnings data |
+| Apps, IAPs, Subscriptions | App Manager | Fetch app/IAP relationships for grouping |
+
+If you only configure the Finance key, earnings will be shown as a flat list without grouping IAPs under their parent apps.
 
 ### Currency Conversion
 
-Proceeds may be in different currencies depending on where sales occurred. The CLI fetches exchange rates from the [Frankfurter API](https://www.frankfurter.app/) (uses European Central Bank rates) and converts everything to SGD.
+Proceeds from App Store sales come in different currencies depending on the storefront. The CLI fetches exchange rates from the [Frankfurter API](https://www.frankfurter.app/) (uses European Central Bank rates) and converts everything to your target currency.
+
+**Note:** Exchange rates may differ slightly from Apple's actual conversion rates, so totals may not match your bank deposits exactly.
 
 ### Caching
 
-Downloaded reports are cached in the `./cache/` directory. Subsequent requests for the same fiscal month will use the cached data instead of re-downloading. Use `--no-cache` to bypass this.
+- **Financial reports** are cached in `./cache/` directory. Use `--no-cache` to bypass.
+- **App/IAP mappings** are cached for 7 days. Use `--refresh-mapping` to update.
 
 ## Troubleshooting
 
-### "No sales report available for..."
+### "No report available for this period"
 
-Reports take a few days to become available after a fiscal month ends. Try selecting an earlier month.
+Financial reports take a few days to become available after a month ends. Try selecting an earlier month.
 
 ### "Missing required environment variables"
 
@@ -152,12 +203,16 @@ Make sure you've created a `.env` file with all required values. See `.env.examp
 ### "401 Unauthorized" or "403 Forbidden"
 
 - Verify your API key credentials are correct
-- Check that the API key has Finance or Admin access
+- Check that the API key has the required access level (Finance for reports)
 - Ensure the API key hasn't been revoked in App Store Connect
+
+### Flat list instead of grouped tree
+
+This happens when the App Manager API key is not configured. Add the optional `ASC_APP_MANAGER_*` credentials to enable grouping.
 
 ### Debug mode
 
-For more detailed error messages:
+For detailed error messages and API response previews:
 
 ```bash
 DEBUG=1 yarn start
@@ -165,9 +220,9 @@ DEBUG=1 yarn start
 
 ## Security Notes
 
-- Never commit your `.env` file or `.p8` key file to version control
+- Never commit your `.env` file or `.p8` key files to version control
 - The `.gitignore` is configured to exclude these files
-- Store your `.p8` file securely - it provides access to your App Store Connect data
+- Store your `.p8` files securely - they provide access to your App Store Connect data
 
 ## License
 

@@ -1,7 +1,13 @@
 import type { AppEarnings, ExchangeRatesResponse } from "../types.js";
 
 const FRANKFURTER_API_URL = "https://api.frankfurter.app";
-const TARGET_CURRENCY = "SGD";
+
+/**
+ * Gets the target currency from environment variable, defaulting to USD.
+ */
+export function getTargetCurrency(): string {
+  return process.env.TARGET_CURRENCY || "USD";
+}
 
 /**
  * Fetches exchange rates from the Frankfurter API.
@@ -11,13 +17,15 @@ const TARGET_CURRENCY = "SGD";
  * @param date - Optional date for historical rates (YYYY-MM-DD format)
  */
 async function fetchRate(baseCurrency: string, date?: string): Promise<number> {
-  // SGD to SGD is always 1
-  if (baseCurrency === TARGET_CURRENCY) {
+  const targetCurrency = getTargetCurrency();
+  
+  // Same currency is always 1:1
+  if (baseCurrency === targetCurrency) {
     return 1;
   }
   
   const endpoint = date ? `/${date}` : "/latest";
-  const url = `${FRANKFURTER_API_URL}${endpoint}?from=${baseCurrency}&to=${TARGET_CURRENCY}`;
+  const url = `${FRANKFURTER_API_URL}${endpoint}?from=${baseCurrency}&to=${targetCurrency}`;
   
   const response = await fetch(url);
   
@@ -27,9 +35,9 @@ async function fetchRate(baseCurrency: string, date?: string): Promise<number> {
   
   const data: ExchangeRatesResponse = await response.json();
   
-  const rate = data.rates[TARGET_CURRENCY];
+  const rate = data.rates[targetCurrency];
   if (!rate) {
-    throw new Error(`No exchange rate found for ${baseCurrency} to ${TARGET_CURRENCY}`);
+    throw new Error(`No exchange rate found for ${baseCurrency} to ${targetCurrency}`);
   }
   
   return rate;
@@ -44,13 +52,14 @@ export async function fetchExchangeRates(
   currencies: string[],
   date?: string
 ): Promise<Map<string, number>> {
+  const targetCurrency = getTargetCurrency();
   const rates = new Map<string, number>();
   
-  // Filter out SGD since it's always 1:1
-  const currenciesToFetch = currencies.filter(c => c !== TARGET_CURRENCY);
+  // Filter out target currency since it's always 1:1
+  const currenciesToFetch = currencies.filter(c => c !== targetCurrency);
   
-  // Add SGD rate
-  rates.set(TARGET_CURRENCY, 1);
+  // Add target currency rate
+  rates.set(targetCurrency, 1);
   
   if (currenciesToFetch.length === 0) {
     return rates;
@@ -77,33 +86,57 @@ export async function fetchExchangeRates(
 }
 
 /**
- * Converts all proceeds in AppEarnings to SGD using the provided exchange rates.
+ * Converts all proceeds in AppEarnings to target currency using the provided exchange rates.
  */
-export function convertToSGD(
+export function convertToTargetCurrency(
   earnings: AppEarnings[],
   exchangeRates: Map<string, number>
 ): AppEarnings[] {
   return earnings.map((app) => {
-    let totalSGD = 0;
+    let total = 0;
     
     for (const [currency, amount] of Object.entries(app.proceedsByCurrency)) {
       const rate = exchangeRates.get(currency) || 1;
-      totalSGD += amount * rate;
+      total += amount * rate;
     }
     
     return {
       ...app,
-      totalProceedsSGD: totalSGD,
+      totalProceeds: total,
     };
   });
 }
 
 /**
- * Formats a number as SGD currency.
+ * Formats a number as currency using the target currency.
  */
-export function formatSGD(amount: number): string {
-  return new Intl.NumberFormat("en-SG", {
+export function formatCurrency(amount: number): string {
+  const targetCurrency = getTargetCurrency();
+  
+  // Determine locale based on currency
+  const localeMap: Record<string, string> = {
+    USD: "en-US",
+    EUR: "de-DE",
+    GBP: "en-GB",
+    SGD: "en-SG",
+    JPY: "ja-JP",
+    AUD: "en-AU",
+    CAD: "en-CA",
+    CHF: "de-CH",
+    CNY: "zh-CN",
+    HKD: "zh-HK",
+    NZD: "en-NZ",
+    SEK: "sv-SE",
+    KRW: "ko-KR",
+    MXN: "es-MX",
+    INR: "en-IN",
+    BRL: "pt-BR",
+  };
+  
+  const locale = localeMap[targetCurrency] || "en-US";
+  
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "SGD",
+    currency: targetCurrency,
   }).format(amount);
 }

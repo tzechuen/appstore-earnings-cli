@@ -120,7 +120,7 @@ export function aggregateByProduct(rows: FinancialReportRow[]): ProductEarnings[
         productType: row.productTypeIdentifier,
         isIAP: row.productTypeIdentifier.startsWith("IA"),
         proceedsByCurrency: {},
-        totalProceedsSGD: 0,
+        totalProceeds: 0,
       };
       productMap.set(productKey, product);
     }
@@ -150,23 +150,23 @@ export function getUniqueCurrencies(products: ProductEarnings[]): string[] {
 }
 
 /**
- * Applies SGD conversion to all products.
+ * Converts all products to target currency.
  */
-export function convertProductsToSGD(
+export function convertProducts(
   products: ProductEarnings[],
   exchangeRates: Map<string, number>
 ): ProductEarnings[] {
   return products.map((product) => {
-    let totalSGD = 0;
+    let total = 0;
     
     for (const [currency, amount] of Object.entries(product.proceedsByCurrency)) {
       const rate = exchangeRates.get(currency) || 1;
-      totalSGD += amount * rate;
+      total += amount * rate;
     }
     
     return {
       ...product,
-      totalProceedsSGD: totalSGD,
+      totalProceeds: total,
     };
   });
 }

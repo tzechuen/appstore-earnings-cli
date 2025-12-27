@@ -3,14 +3,14 @@ import { select } from "@inquirer/prompts";
 
 import { loadConfig, loadAppManagerConfig } from "./api/auth.js";
 import { fetchFinanceReport, NoReportAvailableError } from "./api/financeReports.js";
-import { fetchExchangeRates, formatSGD } from "./api/exchangeRates.js";
+import { fetchExchangeRates, formatCurrency, getTargetCurrency } from "./api/exchangeRates.js";
 import { buildProductMapping, type ProductInfo } from "./api/appStore.js";
 import { getRecentCalendarMonths } from "./utils/calendarMonths.js";
 import {
   parseFinanceReport,
   aggregateByProduct,
   getUniqueCurrencies,
-  convertProductsToSGD,
+  convertProducts,
 } from "./utils/parseFinanceReport.js";
 import { isCached, readCache, writeCache } from "./utils/cache.js";
 import {
@@ -135,21 +135,22 @@ async function main(): Promise<void> {
   
   // Get unique currencies and fetch exchange rates
   const currencies = getUniqueCurrencies(products);
+  const targetCurrency = getTargetCurrency();
   
-  console.log("Converting currencies to SGD...");
+  console.log(`Converting currencies to ${targetCurrency}...`);
   const exchangeRates = await fetchExchangeRates(currencies);
   
-  // Convert to SGD
-  products = convertProductsToSGD(products, exchangeRates);
+  // Convert to target currency
+  products = convertProducts(products, exchangeRates);
   
   // Group products by parent app if we have a mapping
   if (productMapping && productMapping.size > 0) {
     const apps = groupByParentApp(products, productMapping);
-    apps.sort((a, b) => b.totalProceedsSGD - a.totalProceedsSGD);
+    apps.sort((a, b) => b.totalProceeds - a.totalProceeds);
     displayEarningsTree(apps, selectedMonth);
   } else {
     // Flat display without grouping
-    products.sort((a, b) => b.totalProceedsSGD - a.totalProceedsSGD);
+    products.sort((a, b) => b.totalProceeds - a.totalProceeds);
     displayFlatList(products, selectedMonth);
   }
 }
@@ -193,7 +194,7 @@ function groupByParentApp(
         appleIdentifier: parentAppId,
         title: parentAppName,
         sku: "",
-        totalProceedsSGD: 0,
+        totalProceeds: 0,
         appProceeds: 0,
         iaps: [],
       };
@@ -204,15 +205,15 @@ function groupByParentApp(
     if (isIAP) {
       app.iaps.push(product);
     } else {
-      app.appProceeds += product.totalProceedsSGD;
+      app.appProceeds += product.totalProceeds;
     }
     
-    app.totalProceedsSGD += product.totalProceedsSGD;
+    app.totalProceeds += product.totalProceeds;
   }
   
   // Sort IAPs within each app
   for (const app of appMap.values()) {
-    app.iaps.sort((a, b) => b.totalProceedsSGD - a.totalProceedsSGD);
+    app.iaps.sort((a, b) => b.totalProceeds - a.totalProceeds);
   }
   
   return Array.from(appMap.values());
@@ -230,7 +231,7 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
     const app = apps[i];
     const isLastApp = i === apps.length - 1;
     
-    grandTotal += app.totalProceedsSGD;
+    grandTotal += app.totalProceeds;
     
     // App header with tree branch
     const appPrefix = isLastApp ? "└── " : "├── ";
@@ -239,7 +240,7 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
       : app.title;
     
     console.log(
-      `${appPrefix}${truncatedTitle.padEnd(35)} ${formatSGD(app.totalProceedsSGD).padStart(12)}`
+      `${appPrefix}${truncatedTitle.padEnd(35)} ${formatCurrency(app.totalProceeds).padStart(12)}`
     );
     
     // Show IAPs under the app
@@ -250,7 +251,7 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
       const hasIAPs = app.iaps.length > 0;
       const directBranch = hasIAPs ? "├── " : "└── ";
       console.log(
-        `${childPrefix}${directBranch}${"(App Sales)".padEnd(31)} ${formatSGD(app.appProceeds).padStart(12)}`
+        `${childPrefix}${directBranch}${"(App Sales)".padEnd(31)} ${formatCurrency(app.appProceeds).padStart(12)}`
       );
     }
     
@@ -265,7 +266,7 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
         : iap.title;
       
       console.log(
-        `${childPrefix}${iapBranch}${iapTitle.padEnd(31)} ${formatSGD(iap.totalProceedsSGD).padStart(12)}`
+        `${childPrefix}${iapBranch}${iapTitle.padEnd(31)} ${formatCurrency(iap.totalProceeds).padStart(12)}`
       );
     }
     
@@ -278,7 +279,7 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
   // Print total
   console.log("");
   console.log("─".repeat(53));
-  console.log(`${"TOTAL".padStart(39)} ${formatSGD(grandTotal).padStart(12)}`);
+  console.log(`${"TOTAL".padStart(39)} ${formatCurrency(grandTotal).padStart(12)}`);
   console.log("");
 }
 
@@ -297,14 +298,14 @@ function displayFlatList(products: ProductEarnings[], month: CalendarMonth): voi
     const typeLabel = product.isIAP ? "[IAP]" : "[App]";
     
     console.log(
-      `  ${title.padEnd(42)} ${typeLabel} ${formatSGD(product.totalProceedsSGD).padStart(10)}`
+      `  ${title.padEnd(42)} ${typeLabel} ${formatCurrency(product.totalProceeds).padStart(10)}`
     );
-    total += product.totalProceedsSGD;
+    total += product.totalProceeds;
   }
   
   console.log("");
   console.log("─".repeat(65));
-  console.log(`${"TOTAL".padStart(50)} ${formatSGD(total).padStart(12)}`);
+  console.log(`${"TOTAL".padStart(50)} ${formatCurrency(total).padStart(12)}`);
   console.log("");
 }
 

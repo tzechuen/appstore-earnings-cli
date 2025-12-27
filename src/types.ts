@@ -98,7 +98,7 @@ export interface ProductEarnings {
   productType: string; // Product type identifier (e.g., "1", "IA1", "IAY")
   isIAP: boolean; // True if this is an In-App Purchase
   proceedsByCurrency: Record<string, number>;
-  totalProceedsSGD: number;
+  totalProceeds: number; // Converted to target currency
 }
 
 // App with its IAPs grouped together
@@ -106,7 +106,7 @@ export interface AppWithIAPs {
   appleIdentifier: string;
   title: string;
   sku: string;
-  totalProceedsSGD: number; // Total including all IAPs
+  totalProceeds: number; // Total including all IAPs (in target currency)
   appProceeds: number; // Just the app itself (if any direct sales)
   iaps: ProductEarnings[]; // In-App Purchases belonging to this app
 }
@@ -117,7 +117,7 @@ export interface AppEarnings {
   title: string;
   sku: string;
   proceedsByCurrency: Record<string, number>; // e.g., { "USD": 100.50, "EUR": 50.25 }
-  totalProceedsSGD: number; // Converted to SGD
+  totalProceeds: number; // Converted to target currency
 }
 
 // Exchange rates response from Frankfurter API

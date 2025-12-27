@@ -1,5 +1,5 @@
 {
-  "name": "app-store-payments",
+  "name": "appstore-earnings-cli",
   "version": "1.0.0",
   "description": "CLI tool to view App Store earnings by month",
   "type": "module",

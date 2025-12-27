@@ -131,7 +131,7 @@ export function aggregateByApp(rows: SalesReportRow[]): AppEarnings[] {
         title: row.title,
         sku: row.sku,
         proceedsByCurrency: {},
-        totalProceedsSGD: 0,
+        totalProceeds: 0,
       };
       appMap.set(appId, app);
     }
