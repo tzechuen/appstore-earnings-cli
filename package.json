@@ -1,0 +1,25 @@
+{
+  "name": "app-store-payments",
+  "version": "1.0.0",
+  "description": "CLI tool to view App Store earnings by month",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "start:no-cache": "tsx src/index.ts --no-cache"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.2.1",
+    "cli-table3": "^0.6.5",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
