@@ -1,4 +1,4 @@
-import type { FinancialReportRow, ProductEarnings } from "../types.js";
+import type { FinancialReportRow, ProductEarnings, PaymentInfo } from "../types.js";
 
 /**
  * Column indices for the Financial Report TSV.
@@ -169,4 +169,157 @@ export function convertProducts(
       totalProceeds: total,
     };
   });
+}
+
+/**
+ * Parses payment information from a financial report.
+ * 
+ * NOTE: Apple's Finance Reports API does NOT include payment date/status information.
+ * Payment details (date, CCI, bank info) are only visible in the App Store Connect web UI.
+ * 
+ * This function extracts what IS available from the report:
+ * - Fiscal period dates from the data rows
+ * 
+ * It then ESTIMATES payment status based on:
+ * - Apple pays ~33 days after the fiscal month ends
+ * - If current date > estimated payment date, we assume payment was made
+ * 
+ * @param tsvContent - The raw TSV content from a financial report
+ * @param fiscalPeriodEndDate - End date of fiscal period (optional, will try to extract from report)
+ * @returns PaymentInfo object or null if parsing fails
+ */
+export function parsePaymentInfo(
+  tsvContent: string,
+  fiscalPeriodEndDate?: Date
+): PaymentInfo | null {
+  if (!tsvContent || !tsvContent.trim()) {
+    return null;
+  }
+
+  const lines = tsvContent.trim().split("\n");
+  if (lines.length === 0) {
+    return null;
+  }
+
+  // Currency is not used since we display in target currency
+  const currency = "USD";
+  
+  // Initialize with defaults
+  const paymentInfo: PaymentInfo = {
+    paymentDate: null,
+    paymentAmount: null,
+    paymentCurrency: currency,
+    exchangeRate: null,
+    isPending: true,
+    estimatedPaymentDate: null,
+    fiscalPeriodStart: "",
+    fiscalPeriodEnd: "",
+    totalOwed: null,
+  };
+
+  // Parse the report to extract:
+  // 1. Fiscal period dates from the first data row
+  // 2. Total_Amount from the summary footer
+  
+  let totalAmount: number | null = null;
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+    
+    const columns = trimmedLine.split("\t");
+    
+    // Look for Total_Amount in summary footer
+    if (columns[0] === "Total_Amount" && columns.length >= 2) {
+      totalAmount = parseFloat(columns[1]);
+      if (!isNaN(totalAmount)) {
+        paymentInfo.totalOwed = totalAmount;
+      }
+      continue;
+    }
+    
+    // Extract fiscal period from first data row (skip header)
+    // Data rows have dates in MM/DD/YYYY format in columns 0 and 1
+    if (!paymentInfo.fiscalPeriodStart && columns.length >= 2) {
+      const datePattern = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+      if (datePattern.test(columns[0]) && datePattern.test(columns[1])) {
+        paymentInfo.fiscalPeriodStart = columns[0];
+        paymentInfo.fiscalPeriodEnd = columns[1];
+      }
+    }
+  }
+  
+  // Determine fiscal period end date
+  let periodEndDate: Date | null = null;
+  
+  if (fiscalPeriodEndDate) {
+    periodEndDate = fiscalPeriodEndDate;
+  } else if (paymentInfo.fiscalPeriodEnd) {
+    const parts = paymentInfo.fiscalPeriodEnd.split("/");
+    if (parts.length === 3) {
+      periodEndDate = new Date(
+        parseInt(parts[2]),
+        parseInt(parts[0]) - 1,
+        parseInt(parts[1])
+      );
+    }
+  }
+  
+  // Calculate estimated payment date (Apple pays ~33 days after fiscal month end)
+  if (periodEndDate) {
+    const estimatedPaymentDate = new Date(periodEndDate);
+    estimatedPaymentDate.setDate(estimatedPaymentDate.getDate() + 33);
+    
+    paymentInfo.estimatedPaymentDate = formatDateForDisplay(estimatedPaymentDate);
+    
+    // Determine if payment has likely been made
+    // If current date is past the estimated payment date, assume payment was made
+    const now = new Date();
+    if (now > estimatedPaymentDate) {
+      paymentInfo.isPending = false;
+      paymentInfo.paymentDate = formatDateForDisplay(estimatedPaymentDate);
+      paymentInfo.paymentAmount = paymentInfo.totalOwed;
+    }
+  }
+  
+  // Return payment info if we found useful data
+  if (paymentInfo.totalOwed !== null || paymentInfo.fiscalPeriodEnd) {
+    return paymentInfo;
+  }
+  
+  return null;
+}
+
+/**
+ * Formats a date for display (e.g., "Nov 1, 2025")
+ */
+function formatDateForDisplay(date: Date): string {
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  ];
+  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+/**
+ * Calculates total proceeds from the consolidated report (ZZ region)
+ * for display when region-specific payment info is not available.
+ * 
+ * @param rows - Parsed financial report rows
+ * @param exchangeRates - Exchange rates map (currency -> rate to target currency)
+ * @returns Total proceeds in target currency
+ */
+export function calculateTotalProceeds(
+  rows: FinancialReportRow[],
+  exchangeRates: Map<string, number>
+): number {
+  let total = 0;
+  
+  for (const row of rows) {
+    const currency = row.partnerShareCurrency || "USD";
+    const rate = exchangeRates.get(currency) || 1;
+    total += row.extendedPartnerShare * rate;
+  }
+  
+  return total;
 }

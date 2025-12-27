@@ -5,6 +5,7 @@ A free, open-source CLI tool to view your App Store earnings by month. A simple 
 ## Features
 
 - View monthly earnings in a clean tree format (apps with their IAPs grouped together)
+- **Payment info display** - see when Apple paid you and how much was deposited
 - Configurable target currency (USD, EUR, GBP, SGD, etc.)
 - Automatic currency conversion using ECB exchange rates
 - Groups In-App Purchases and subscriptions under their parent apps
@@ -37,6 +38,10 @@ Converting currencies to USD...
 
 ─────────────────────────────────────────────────────
                                   TOTAL      $208.66
+
+  Payment Status: Paid (estimated)
+  Payment Date: ~Oct 5, 2025
+  Amount: ~$208.66
 ```
 
 ## Prerequisites
@@ -156,6 +161,14 @@ TARGET_CURRENCY=JPY   # Japanese Yen
 ```
 
 Supported currencies include: USD, EUR, GBP, SGD, JPY, AUD, CAD, CHF, CNY, HKD, NZD, SEK, KRW, MXN, INR, BRL, and more.
+
+### Payment info
+
+The CLI displays estimated payment date and status for each month. Payment information is automatically extracted from the financial report.
+
+**Important:** Apple's Finance Reports API does not include actual payment dates - this information is only visible in the App Store Connect web interface. The CLI **estimates** payment status based on Apple's typical payment schedule (~33 days after the fiscal month ends). Actual payment dates may vary slightly.
+
+The payment amount shown is the total proceeds in your target currency (same as the TOTAL line).
 
 ## How It Works
 

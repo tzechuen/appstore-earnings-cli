@@ -134,3 +134,16 @@ export interface CacheMetadata {
   downloadedAt: string;
   reportDate: string;
 }
+
+// Payment information extracted from region-specific finance report
+export interface PaymentInfo {
+  paymentDate: string | null;           // MM/DD/YYYY format, null if pending
+  paymentAmount: number | null;         // Actual amount paid to bank
+  paymentCurrency: string;              // Bank account currency (USD, AUD, etc.)
+  exchangeRate: number | null;          // FX rate used for conversion
+  isPending: boolean;                   // True if payment not yet issued
+  estimatedPaymentDate: string | null;  // Estimated date if pending (~33 days after fiscal month end)
+  fiscalPeriodStart: string;            // Period start date
+  fiscalPeriodEnd: string;              // Period end date
+  totalOwed: number | null;             // Total owed before payment (for pending)
+}

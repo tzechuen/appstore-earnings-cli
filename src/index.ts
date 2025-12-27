@@ -11,6 +11,7 @@ import {
   aggregateByProduct,
   getUniqueCurrencies,
   convertProducts,
+  parsePaymentInfo,
 } from "./utils/parseFinanceReport.js";
 import { isCached, readCache, writeCache } from "./utils/cache.js";
 import {
@@ -18,7 +19,7 @@ import {
   readMappingCache,
   writeMappingCache,
 } from "./utils/productMappingCache.js";
-import type { CalendarMonth, ProductEarnings, AppWithIAPs } from "./types.js";
+import type { CalendarMonth, ProductEarnings, AppWithIAPs, PaymentInfo } from "./types.js";
 
 // Check for flags
 const useCache = !process.argv.includes("--no-cache");
@@ -143,15 +144,19 @@ async function main(): Promise<void> {
   // Convert to target currency
   products = convertProducts(products, exchangeRates);
   
+  // Parse payment information from the consolidated report
+  // Extracts fiscal period dates and estimates payment status based on timing
+  const paymentInfo = parsePaymentInfo(reportContent);
+  
   // Group products by parent app if we have a mapping
   if (productMapping && productMapping.size > 0) {
     const apps = groupByParentApp(products, productMapping);
     apps.sort((a, b) => b.totalProceeds - a.totalProceeds);
-    displayEarningsTree(apps, selectedMonth);
+    displayEarningsTree(apps, selectedMonth, paymentInfo);
   } else {
     // Flat display without grouping
     products.sort((a, b) => b.totalProceeds - a.totalProceeds);
-    displayFlatList(products, selectedMonth);
+    displayFlatList(products, selectedMonth, paymentInfo);
   }
 }
 
@@ -222,7 +227,7 @@ function groupByParentApp(
 /**
  * Displays earnings in a tree format with apps and their IAPs.
  */
-function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
+function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth, paymentInfo: PaymentInfo | null): void {
   console.log(`\n  Earnings for ${month.displayName}\n`);
   
   let grandTotal = 0;
@@ -280,13 +285,15 @@ function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth): void {
   console.log("");
   console.log("─".repeat(53));
   console.log(`${"TOTAL".padStart(39)} ${formatCurrency(grandTotal).padStart(12)}`);
-  console.log("");
+  
+  // Display payment info
+  displayPaymentSummary(paymentInfo, grandTotal);
 }
 
 /**
  * Displays earnings as a flat list (fallback when no mapping available).
  */
-function displayFlatList(products: ProductEarnings[], month: CalendarMonth): void {
+function displayFlatList(products: ProductEarnings[], month: CalendarMonth, paymentInfo: PaymentInfo | null): void {
   console.log(`\n  Earnings for ${month.displayName}\n`);
   
   let total = 0;
@@ -306,6 +313,52 @@ function displayFlatList(products: ProductEarnings[], month: CalendarMonth): voi
   console.log("");
   console.log("─".repeat(65));
   console.log(`${"TOTAL".padStart(50)} ${formatCurrency(total).padStart(12)}`);
+  
+  // Display payment info
+  displayPaymentSummary(paymentInfo, total);
+}
+
+/**
+ * Displays payment summary information as a footer.
+ * 
+ * NOTE: Apple's Finance Reports API does not include actual payment date/status.
+ * Payment status is ESTIMATED based on Apple's typical payment schedule (~33 days
+ * after fiscal month end). Actual payment dates may vary slightly.
+ * 
+ * The amount shown is the same as the TOTAL (in target currency), which represents
+ * the combined proceeds from all regions after currency conversion.
+ */
+function displayPaymentSummary(paymentInfo: PaymentInfo | null, totalProceeds: number): void {
+  console.log("");
+  
+  if (!paymentInfo) {
+    console.log("  Payment Info: Not available");
+    console.log("");
+    return;
+  }
+  
+  // Use the calculated total in target currency (approximate due to FX fluctuations)
+  const amount = formatCurrency(totalProceeds);
+  
+  if (paymentInfo.isPending) {
+    // Payment is pending
+    console.log("  Payment Status: Pending");
+    console.log(`  Amount: ~${amount}`);
+    
+    if (paymentInfo.estimatedPaymentDate) {
+      console.log(`  Expected Payment: ~${paymentInfo.estimatedPaymentDate}`);
+    }
+  } else {
+    // Payment likely made (based on timing estimate)
+    console.log("  Payment Status: Paid (estimated)");
+    
+    if (paymentInfo.paymentDate) {
+      console.log(`  Payment Date: ~${paymentInfo.paymentDate}`);
+    }
+    
+    console.log(`  Amount: ~${amount}`);
+  }
+  
   console.log("");
 }
 
