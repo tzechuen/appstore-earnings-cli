@@ -4,6 +4,7 @@ A free, open-source CLI tool to view your App Store earnings by month. A simple 
 
 ## Features
 
+- **Standalone binary** - No runtime dependencies required
 - View monthly earnings in a clean tree format (apps with their IAPs grouped together)
 - **Payment info display** - see when Apple paid you and how much was deposited
 - Configurable target currency (USD, EUR, GBP, SGD, etc.)
@@ -11,6 +12,7 @@ A free, open-source CLI tool to view your App Store earnings by month. A simple 
 - Groups In-App Purchases and subscriptions under their parent apps
 - Caches reports locally to avoid repeated API calls
 - Shows the last 24 months for selection
+- **Interactive setup wizard** for first-time configuration
 
 ## Example Output
 
@@ -44,24 +46,123 @@ Converting currencies to USD...
   Amount: ~$208.66
 ```
 
-## Prerequisites
+## Installation
 
-- Node.js 18.0.0 or higher
-- yarn or npm
-- An Apple Developer account with apps on the App Store
-- App Store Connect API access (requires Account Holder or Admin role)
+### Option 1: Standalone Binary (Recommended)
 
-## Setup
+Download and install with a single command:
 
-### 1. Clone and install dependencies
+```bash
+curl -fsSL https://raw.githubusercontent.com/tzechuen/appstore-earnings-cli/main/install.sh | bash
+```
+
+This will:
+- Detect your OS and architecture
+- Download the appropriate binary from GitHub Releases
+- Install to `/usr/local/bin` (or `~/.local/bin` if no sudo access)
+
+### Option 2: Manual Download
+
+Download the appropriate binary from the [Releases page](https://github.com/tzechuen/appstore-earnings-cli/releases):
+
+| Platform | Binary |
+|----------|--------|
+| macOS (Apple Silicon) | `appstore-earnings-darwin-arm64` |
+| macOS (Intel) | `appstore-earnings-darwin-x64` |
+| Linux x64 | `appstore-earnings-linux-x64` |
+| Linux ARM64 | `appstore-earnings-linux-arm64` |
+| Windows x64 | `appstore-earnings-windows-x64.exe` |
+
+Then make it executable and move to your PATH:
+
+```bash
+chmod +x appstore-earnings-darwin-arm64
+sudo mv appstore-earnings-darwin-arm64 /usr/local/bin/appstore-earnings
+```
+
+### Option 3: Build from Source
+
+Requires [Bun](https://bun.sh) installed.
 
 ```bash
 git clone https://github.com/tzechuen/appstore-earnings-cli.git
 cd appstore-earnings-cli
-yarn install
+bun install
+bun run build
+# Binary is now at ./bin/appstore-earnings
 ```
 
-### 2. Create App Store Connect API Keys
+## Setup
+
+### First-Time Configuration
+
+Run the setup wizard to configure your API credentials:
+
+```bash
+appstore-earnings --setup
+```
+
+The wizard will guide you through:
+1. Entering your App Store Connect API credentials
+2. Copying your `.p8` key files to a secure location
+3. Setting your preferred currency
+
+### Configuration Options
+
+Configuration is loaded in priority order:
+
+1. **Environment variables** (highest priority)
+2. **`.env` file** in current working directory
+3. **Config file** at `~/.config/appstore-earnings-cli/config.json`
+
+#### Environment Variables
+
+```bash
+# Required: Finance API Key
+export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+export ASC_KEY_ID=XXXXXXXXXX
+export ASC_PRIVATE_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
+export ASC_VENDOR_NUMBER=12345678
+
+# Optional: App Manager API Key (for grouping IAPs under apps)
+export ASC_APP_MANAGER_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+export ASC_APP_MANAGER_KEY_ID=YYYYYYYYYY
+export ASC_APP_MANAGER_PRIVATE_KEY_PATH=/path/to/AuthKey_YYYYYYYYYY.p8
+
+# Optional: Target currency (default: USD)
+export TARGET_CURRENCY=USD
+
+# Optional: Custom cache directory
+export ASC_CACHE_DIR=/path/to/cache
+```
+
+#### Config File Format
+
+`~/.config/appstore-earnings-cli/config.json`:
+
+```json
+{
+  "issuerId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "keyId": "XXXXXXXXXX",
+  "privateKeyPath": "keys/AuthKey_XXXXXXXXXX.p8",
+  "vendorNumber": "12345678",
+  "targetCurrency": "USD",
+  "appManagerIssuerId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "appManagerKeyId": "YYYYYYYYYY",
+  "appManagerPrivateKeyPath": "keys/AuthKey_YYYYYYYYYY.p8"
+}
+```
+
+### Private Key Handling
+
+The CLI supports multiple ways to provide your private key:
+
+1. **Absolute path**: `/Users/me/keys/AuthKey.p8`
+2. **Relative to config directory**: `keys/AuthKey.p8` (relative to `~/.config/appstore-earnings-cli/`)
+3. **Relative to current directory**: `./AuthKey.p8`
+4. **Base64 encoded** (for CI/CD): `base64:LS0tLS1CRUdJTi...`
+
+### Creating API Keys
 
 You need **one required key** and **one optional key**:
 
@@ -87,47 +188,18 @@ This key enables grouping of In-App Purchases under their parent apps. Without i
 3. Select **App Manager** access level (or **Admin** if you prefer)
 4. Download and save the `.p8` file separately
 
-### 3. Find your Vendor Number
+### Finding Your Vendor Number
 
 1. In App Store Connect, go to **Payments and Financial Reports**
 2. Click on **Payments** or **Financial Reports**
 3. Your Vendor Number is displayed in the top-right area (it's a numeric ID like `12345678`)
 
-### 4. Configure the CLI
-
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Move your `.p8` files to the project directory:
-   ```bash
-   mv ~/Downloads/AuthKey_XXXXXXXXXX.p8 ./
-   ```
-
-3. Edit `.env` with your credentials:
-   ```bash
-   # Required: Finance API Key
-   ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-   ASC_KEY_ID=XXXXXXXXXX
-   ASC_PRIVATE_KEY_PATH=./AuthKey_XXXXXXXXXX.p8
-   ASC_VENDOR_NUMBER=12345678
-
-   # Optional: App Manager API Key (for grouping IAPs under apps)
-   ASC_APP_MANAGER_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-   ASC_APP_MANAGER_KEY_ID=YYYYYYYYYY
-   ASC_APP_MANAGER_PRIVATE_KEY_PATH=./AuthKey_YYYYYYYYYY.p8
-
-   # Optional: Target currency (default: USD)
-   TARGET_CURRENCY=USD
-   ```
-
 ## Usage
 
-### Basic usage
+### Basic Usage
 
 ```bash
-yarn start
+appstore-earnings
 ```
 
 This will:
@@ -140,35 +212,29 @@ This will:
 
 ```bash
 # Bypass cache and re-download the report
-yarn start --no-cache
+appstore-earnings --no-cache
 
 # Refresh the app/IAP mapping cache
-yarn start --refresh-mapping
+appstore-earnings --refresh-mapping
+
+# Run the setup wizard
+appstore-earnings --setup
+
+# Show configuration status
+appstore-earnings --status
 
 # Enable debug output
-DEBUG=1 yarn start
+DEBUG=1 appstore-earnings
 ```
 
-### Changing the target currency
+### Cache Locations
 
-Set the `TARGET_CURRENCY` environment variable in your `.env` file:
+Cache files are stored in XDG-compliant locations:
 
-```bash
-TARGET_CURRENCY=EUR   # Euros
-TARGET_CURRENCY=GBP   # British Pounds
-TARGET_CURRENCY=SGD   # Singapore Dollars
-TARGET_CURRENCY=JPY   # Japanese Yen
-```
+- **Reports**: `~/.cache/appstore-earnings-cli/reports/`
+- **Product mapping**: `~/.cache/appstore-earnings-cli/product-mapping.json`
 
-Supported currencies include: USD, EUR, GBP, SGD, JPY, AUD, CAD, CHF, CNY, HKD, NZD, SEK, KRW, MXN, INR, BRL, and more.
-
-### Payment info
-
-The CLI displays estimated payment date and status for each month. Payment information is automatically extracted from the financial report.
-
-**Important:** Apple's Finance Reports API does not include actual payment dates - this information is only visible in the App Store Connect web interface. The CLI **estimates** payment status based on Apple's typical payment schedule (~33 days after the fiscal month ends). Actual payment dates may vary slightly.
-
-The payment amount shown is the total proceeds in your target currency (same as the TOTAL line).
+You can override the cache location with `ASC_CACHE_DIR`.
 
 ## How It Works
 
@@ -193,10 +259,11 @@ Proceeds from App Store sales come in different currencies depending on the stor
 
 **Note:** Exchange rates may differ slightly from Apple's actual conversion rates, so totals may not match your bank deposits exactly.
 
-### Caching
+### Payment Info
 
-- **Financial reports** are cached in `./cache/` directory. Use `--no-cache` to bypass.
-- **App/IAP mappings** are cached for 7 days. Use `--refresh-mapping` to update.
+The CLI displays estimated payment date and status for each month. Payment information is automatically extracted from the financial report.
+
+**Important:** Apple's Finance Reports API does not include actual payment dates - this information is only visible in the App Store Connect web interface. The CLI **estimates** payment status based on Apple's typical payment schedule (~33 days after the fiscal month ends). Actual payment dates may vary slightly.
 
 ## Troubleshooting
 
@@ -204,14 +271,18 @@ Proceeds from App Store sales come in different currencies depending on the stor
 
 Financial reports take a few days to become available after a month ends. Try selecting an earlier month.
 
-### "Missing required environment variables"
+### "Missing required configuration"
 
-Make sure you've created a `.env` file with all required values. See `.env.example` for the template.
+Make sure you've configured your credentials using one of:
+- `appstore-earnings --setup` (recommended)
+- Environment variables
+- `.env` file in current directory
 
 ### "Error reading private key"
 
-- Check that the `.p8` file path in `ASC_PRIVATE_KEY_PATH` is correct
+- Check that the `.p8` file path is correct
 - Make sure the file exists and is readable
+- Try using an absolute path
 
 ### "401 Unauthorized" or "403 Forbidden"
 
@@ -221,14 +292,37 @@ Make sure you've created a `.env` file with all required values. See `.env.examp
 
 ### Flat list instead of grouped tree
 
-This happens when the App Manager API key is not configured. Add the optional `ASC_APP_MANAGER_*` credentials to enable grouping.
+This happens when the App Manager API key is not configured. Add the optional App Manager credentials to enable grouping.
 
 ### Debug mode
 
 For detailed error messages and API response previews:
 
 ```bash
-DEBUG=1 yarn start
+DEBUG=1 appstore-earnings
+```
+
+## Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh) 1.0 or higher
+
+### Running locally
+
+```bash
+bun install
+bun run start
+```
+
+### Building
+
+```bash
+# Build for current platform
+bun run build
+
+# Build for all platforms
+bun run build:all
 ```
 
 ## Security Notes
@@ -236,6 +330,7 @@ DEBUG=1 yarn start
 - Never commit your `.env` file or `.p8` key files to version control
 - The `.gitignore` is configured to exclude these files
 - Store your `.p8` files securely - they provide access to your App Store Connect data
+- When using the setup wizard, keys are stored in `~/.config/appstore-earnings-cli/keys/`
 
 ## License
 

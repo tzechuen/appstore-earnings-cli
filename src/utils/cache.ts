@@ -1,21 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
+import { getCacheDir, ensureDir } from "../config/loader.js";
 import type { CalendarMonth } from "../types.js";
 
-// Get the project root directory
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PROJECT_ROOT = join(__dirname, "..", "..");
-const CACHE_DIR = join(PROJECT_ROOT, "cache");
+/**
+ * Gets the cache directory path.
+ * Uses XDG-compliant location: ~/.cache/appstore-earnings-cli/reports
+ */
+function getReportsCacheDir(): string {
+  return join(getCacheDir(), "reports");
+}
 
 /**
  * Ensures the cache directory exists.
  */
 function ensureCacheDir(): void {
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
-  }
+  ensureDir(getReportsCacheDir());
 }
 
 /**
@@ -29,7 +29,7 @@ function getCacheFilename(month: CalendarMonth): string {
  * Gets the full path to a cached report file.
  */
 function getCachePath(month: CalendarMonth): string {
-  return join(CACHE_DIR, getCacheFilename(month));
+  return join(getReportsCacheDir(), getCacheFilename(month));
 }
 
 /**
@@ -45,11 +45,11 @@ export function isCached(month: CalendarMonth): boolean {
  */
 export function readCache(month: CalendarMonth): string | null {
   const cachePath = getCachePath(month);
-  
+
   if (!existsSync(cachePath)) {
     return null;
   }
-  
+
   return readFileSync(cachePath, "utf-8");
 }
 
@@ -58,9 +58,9 @@ export function readCache(month: CalendarMonth): string | null {
  */
 export function writeCache(month: CalendarMonth, content: string): void {
   ensureCacheDir();
-  
+
   const cachePath = getCachePath(month);
-  
+
   // Write the report content
   writeFileSync(cachePath, content, "utf-8");
 }

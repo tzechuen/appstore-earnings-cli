@@ -1,12 +1,14 @@
 import type { AppEarnings, ExchangeRatesResponse } from "../types.js";
+import { loadConfig } from "../config/loader.js";
 
 const FRANKFURTER_API_URL = "https://api.frankfurter.app";
 
 /**
- * Gets the target currency from environment variable, defaulting to USD.
+ * Gets the target currency from config, defaulting to USD.
  */
 export function getTargetCurrency(): string {
-  return process.env.TARGET_CURRENCY || "USD";
+  const config = loadConfig();
+  return config.targetCurrency;
 }
 
 /**

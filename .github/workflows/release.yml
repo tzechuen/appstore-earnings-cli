@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-latest
+            binary_name: appstore-earnings-darwin-arm64
+          - target: darwin-x64
+            os: macos-latest
+            binary_name: appstore-earnings-darwin-x64
+          - target: linux-x64
+            os: ubuntu-latest
+            binary_name: appstore-earnings-linux-x64
+          - target: linux-arm64
+            os: ubuntu-latest
+            binary_name: appstore-earnings-linux-arm64
+          - target: windows-x64
+            os: ubuntu-latest
+            binary_name: appstore-earnings-windows-x64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: |
+          mkdir -p bin
+          bun build src/index.ts --compile --target=bun-${{ matrix.target }} --outfile bin/${{ matrix.binary_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.binary_name }}
+          path: bin/${{ matrix.binary_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          # Move all binaries to release folder
+          for dir in artifacts/*/; do
+            mv "$dir"* release/ || true
+          done
+          # Make binaries executable
+          chmod +x release/appstore-earnings-darwin-* release/appstore-earnings-linux-* || true
+          ls -la release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

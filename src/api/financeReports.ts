@@ -16,8 +16,8 @@ export async function downloadFinanceReport(
   config: AppStoreConnectConfig,
   month: CalendarMonth
 ): Promise<string> {
-  const token = generateToken(config);
-  
+  const token = await generateToken(config);
+
   // Finance Reports use regionCode instead of just vendorNumber
   // Use ZZ for consolidated report (all regions)
   const queryString = new URLSearchParams({
@@ -26,9 +26,9 @@ export async function downloadFinanceReport(
     "filter[reportType]": "FINANCIAL",
     "filter[vendorNumber]": config.vendorNumber,
   }).toString();
-  
+
   const url = `${BASE_URL}?${queryString}`;
-  
+
   const response = await fetch(url, {
     method: "GET",
     headers: {
@@ -36,7 +36,7 @@ export async function downloadFinanceReport(
       Accept: "application/a-gzip, application/json",
     },
   });
-  
+
   if (!response.ok) {
     // Try to parse error response
     const contentType = response.headers.get("content-type");
@@ -54,13 +54,13 @@ export async function downloadFinanceReport(
   // Check if response is gzipped
   const contentType = response.headers.get("content-type");
   const buffer = await response.arrayBuffer();
-  
+
   if (contentType?.includes("gzip") || contentType?.includes("application/a-gzip")) {
     // Decompress gzipped response
     const decompressed = gunzipSync(Buffer.from(buffer));
     return decompressed.toString("utf-8");
   }
-  
+
   // If not gzipped, return as-is
   return Buffer.from(buffer).toString("utf-8");
 }
@@ -81,7 +81,7 @@ export async function downloadRegionFinanceReport(
   month: CalendarMonth,
   regionCode: string
 ): Promise<string> {
-  const token = generateToken(config);
+  const token = await generateToken(config);
   
   const queryString = new URLSearchParams({
     "filter[regionCode]": regionCode,

@@ -3,12 +3,14 @@ node_modules/
 
 # Build output
 dist/
+bin/
+*.exe
 
 # Environment and credentials
 .env
 *.p8
 
-# Cache
+# Cache (now in XDG location, but keep for backwards compat)
 cache/
 
 # OS files
@@ -20,3 +22,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Bun
+bun.lockb

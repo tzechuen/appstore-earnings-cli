@@ -49,7 +49,7 @@ async function fetchAllPages<T>(
   config: AppManagerConfig,
   initialUrl: string
 ): Promise<T[]> {
-  const token = generateToken(config);
+  const token = await generateToken(config);
   const allData: T[] = [];
   let url: string | undefined = initialUrl;
   
