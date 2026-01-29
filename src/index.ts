@@ -23,12 +23,43 @@ import { runSetupWizard, showConfigStatus } from "./config/setup.js";
 import type { CalendarMonth, ProductEarnings, AppWithIAPs, PaymentInfo } from "./types.js";
 
 // Check for flags
+const showHelpFlag = process.argv.includes("--help") || process.argv.includes("-h");
 const useCache = !process.argv.includes("--no-cache");
 const refreshMapping = process.argv.includes("--refresh-mapping");
 const runSetup = process.argv.includes("--setup");
 const showStatus = process.argv.includes("--status");
 
+/**
+ * Displays help information for the CLI.
+ */
+function showHelp(): void {
+  console.log(`
+App Store Earnings CLI
+
+Usage: appstore-earnings [options]
+
+Options:
+  --help, -h         Show this help message
+  --setup            Run interactive setup wizard
+  --status           Show configuration status
+  --no-cache         Bypass cache and fetch fresh data
+  --refresh-mapping  Refresh the app/IAP product mapping
+
+Environment variables:
+  DEBUG=1            Enable debug output
+  ASC_CACHE_DIR      Override cache directory
+
+Documentation: https://github.com/tzechuen/appstore-earnings-cli
+`);
+}
+
 async function main(): Promise<void> {
+  // Handle --help flag
+  if (showHelpFlag) {
+    showHelp();
+    return;
+  }
+
   // Handle --status flag
   if (showStatus) {
     showConfigStatus();
