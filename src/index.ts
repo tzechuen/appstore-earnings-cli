@@ -28,6 +28,7 @@ const useCache = !process.argv.includes("--no-cache");
 const refreshMapping = process.argv.includes("--refresh-mapping");
 const runSetup = process.argv.includes("--setup");
 const showStatus = process.argv.includes("--status");
+const runDemo = process.argv.includes("--demo");
 
 /**
  * Displays help information for the CLI.
@@ -44,6 +45,7 @@ Options:
   --status           Show configuration status
   --no-cache         Bypass cache and fetch fresh data
   --refresh-mapping  Refresh the app/IAP product mapping
+  --demo             Run with fake data (for demos/screenshots)
 
 Environment variables:
   DEBUG=1            Enable debug output
@@ -51,6 +53,98 @@ Environment variables:
 
 Documentation: https://github.com/tzechuen/appstore-earnings-cli
 `);
+}
+
+/**
+ * Runs a demo mode with fake data for screenshots and demos.
+ */
+async function runDemoMode(): Promise<void> {
+  console.log("\n  App Store Earnings CLI\n");
+
+  // Get list of calendar months
+  const months = getRecentCalendarMonths(24);
+
+  // Prompt user to select a month
+  const selectedMonth = await select<CalendarMonth>({
+    message: "Select month:",
+    choices: months.map((month) => ({
+      name: month.displayName,
+      value: month,
+    })),
+  });
+
+  console.log(`\nFetching financial report for ${selectedMonth.displayName}...`);
+
+  // Simulate a small delay for realism
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  console.log("Converting currencies to USD...");
+
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  // Fake demo data
+  const demoApps: AppWithIAPs[] = [
+    {
+      appleIdentifier: "1234567890",
+      title: "Photo Editor Pro",
+      sku: "com.demo.photoeditor",
+      totalProceeds: 847.22,
+      appProceeds: 0,
+      iaps: [
+        { appleIdentifier: "1234567891", title: "Pro Subscription (Yearly)", sku: "yearly_sub", productType: "IAY", isIAP: true, proceedsByCurrency: {}, totalProceeds: 599.99 },
+        { appleIdentifier: "1234567892", title: "Pro Subscription (Monthly)", sku: "monthly_sub", productType: "IAY", isIAP: true, proceedsByCurrency: {}, totalProceeds: 189.94 },
+        { appleIdentifier: "1234567893", title: "Remove Watermarks", sku: "remove_watermarks", productType: "IA1", isIAP: true, proceedsByCurrency: {}, totalProceeds: 57.29 },
+      ]
+    },
+    {
+      appleIdentifier: "2345678901",
+      title: "Task Manager",
+      sku: "com.demo.taskmanager",
+      totalProceeds: 234.50,
+      appProceeds: 34.50,
+      iaps: [
+        { appleIdentifier: "2345678902", title: "Premium Upgrade", sku: "premium", productType: "IA1", isIAP: true, proceedsByCurrency: {}, totalProceeds: 200.00 },
+      ]
+    },
+    {
+      appleIdentifier: "3456789012",
+      title: "Weather Plus",
+      sku: "com.demo.weatherplus",
+      totalProceeds: 89.97,
+      appProceeds: 89.97,
+      iaps: []
+    }
+  ];
+
+  // Create fake payment info (pending payment)
+  const demoPaymentInfo: PaymentInfo = {
+    paymentDate: null,
+    paymentAmount: null,
+    paymentCurrency: "USD",
+    exchangeRate: null,
+    isPending: true,
+    estimatedPaymentDate: getEstimatedPaymentDate(selectedMonth),
+    fiscalPeriodStart: "",
+    fiscalPeriodEnd: "",
+    totalOwed: 1171.69,
+  };
+
+  displayEarningsTree(demoApps, selectedMonth, demoPaymentInfo);
+}
+
+/**
+ * Calculates an estimated payment date (~33 days after month end).
+ */
+function getEstimatedPaymentDate(month: CalendarMonth): string {
+  const monthEnd = new Date(month.year, month.month, 0); // Last day of month
+  const paymentDate = new Date(monthEnd);
+  paymentDate.setDate(paymentDate.getDate() + 33);
+
+  return paymentDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 async function main(): Promise<void> {
@@ -63,6 +157,12 @@ async function main(): Promise<void> {
   // Handle --status flag
   if (showStatus) {
     showConfigStatus();
+    return;
+  }
+
+  // Handle --demo flag
+  if (runDemo) {
+    await runDemoMode();
     return;
   }
 

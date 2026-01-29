@@ -2,6 +2,8 @@
 
 A free, open-source CLI tool to view your App Store earnings by month. A simple alternative to paid services like appFigures for basic earnings tracking.
 
+![Demo](demo.gif)
+
 ## Features
 
 - **Standalone binary** - No runtime dependencies required
