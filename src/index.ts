@@ -116,14 +116,17 @@ async function runDemoMode(): Promise<void> {
     }
   ];
 
-  // Create fake payment info (pending payment)
+  // Create fake payment info, marked paid once the estimated payment date has passed
+  const estimatedPaymentDate = getEstimatedPaymentDate(selectedMonth);
+  const isPending = new Date() <= estimatedPaymentDate;
+  const formattedPaymentDate = formatDemoDate(estimatedPaymentDate);
   const demoPaymentInfo: PaymentInfo = {
-    paymentDate: null,
-    paymentAmount: null,
+    paymentDate: isPending ? null : formattedPaymentDate,
+    paymentAmount: isPending ? null : 1171.69,
     paymentCurrency: "USD",
     exchangeRate: null,
-    isPending: true,
-    estimatedPaymentDate: getEstimatedPaymentDate(selectedMonth),
+    isPending,
+    estimatedPaymentDate: formattedPaymentDate,
     fiscalPeriodStart: "",
     fiscalPeriodEnd: "",
     totalOwed: 1171.69,
@@ -135,12 +138,15 @@ async function runDemoMode(): Promise<void> {
 /**
  * Calculates an estimated payment date (~33 days after month end).
  */
-function getEstimatedPaymentDate(month: CalendarMonth): string {
+function getEstimatedPaymentDate(month: CalendarMonth): Date {
   const monthEnd = new Date(month.year, month.month, 0); // Last day of month
   const paymentDate = new Date(monthEnd);
   paymentDate.setDate(paymentDate.getDate() + 33);
+  return paymentDate;
+}
 
-  return paymentDate.toLocaleDateString("en-US", {
+function formatDemoDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
