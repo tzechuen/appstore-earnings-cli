@@ -323,6 +323,9 @@ bun run start
 # Build for current platform
 bun run build
 
+# Build and install to /usr/local/bin
+bun run install:local
+
 # Build for all platforms
 bun run build:all
 ```
