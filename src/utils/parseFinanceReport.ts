@@ -160,7 +160,8 @@ export function convertProducts(
     let total = 0;
     
     for (const [currency, amount] of Object.entries(product.proceedsByCurrency)) {
-      const rate = exchangeRates.get(currency) || 1;
+      const rate = exchangeRates.get(currency);
+      if (rate === undefined) continue;
       total += amount * rate;
     }
     
@@ -317,7 +318,8 @@ export function calculateTotalProceeds(
   
   for (const row of rows) {
     const currency = row.partnerShareCurrency || "USD";
-    const rate = exchangeRates.get(currency) || 1;
+    const rate = exchangeRates.get(currency);
+    if (rate === undefined) continue;
     total += row.extendedPartnerShare * rate;
   }
   

@@ -12,37 +12,85 @@ export function getTargetCurrency(): string {
 }
 
 /**
- * Fetches exchange rates from the Frankfurter API.
- * Uses the European Central Bank rates.
- * 
+ * Fallback source covering currencies the ECB doesn't publish (e.g. TWD, AED, SAR, VND).
+ * https://github.com/fawazahmed0/exchange-api
+ */
+const FALLBACK_API_URLS = [
+  (date: string) => `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${date}/v1/currencies`,
+  (date: string) => `https://${date}.currency-api.pages.dev/v1/currencies`,
+];
+
+/**
+ * Fetches a rate from the Frankfurter API (European Central Bank rates).
+ *
  * @param baseCurrency - The base currency to convert from
  * @param date - Optional date for historical rates (YYYY-MM-DD format)
  */
-async function fetchRate(baseCurrency: string, date?: string): Promise<number> {
-  const targetCurrency = getTargetCurrency();
-  
-  // Same currency is always 1:1
-  if (baseCurrency === targetCurrency) {
-    return 1;
-  }
-  
+async function fetchFrankfurterRate(baseCurrency: string, targetCurrency: string, date?: string): Promise<number> {
   const endpoint = date ? `/${date}` : "/latest";
   const url = `${FRANKFURTER_API_URL}${endpoint}?from=${baseCurrency}&to=${targetCurrency}`;
-  
+
   const response = await fetch(url);
-  
+
   if (!response.ok) {
     throw new Error(`Failed to fetch exchange rate for ${baseCurrency}: ${response.statusText}`);
   }
-  
+
   const data: ExchangeRatesResponse = await response.json();
-  
+
   const rate = data.rates[targetCurrency];
   if (!rate) {
     throw new Error(`No exchange rate found for ${baseCurrency} to ${targetCurrency}`);
   }
-  
+
   return rate;
+}
+
+/**
+ * Fetches a rate from the fallback currency API, trying each mirror in turn.
+ */
+async function fetchFallbackRate(baseCurrency: string, targetCurrency: string, date?: string): Promise<number> {
+  const base = baseCurrency.toLowerCase();
+  const target = targetCurrency.toLowerCase();
+  let lastError: unknown;
+
+  for (const buildUrl of FALLBACK_API_URLS) {
+    try {
+      const response = await fetch(`${buildUrl(date || "latest")}/${base}.json`);
+      if (!response.ok) {
+        throw new Error(response.statusText);
+      }
+      const data = (await response.json()) as Record<string, Record<string, number>>;
+      const rate = data[base]?.[target];
+      if (typeof rate === "number" && rate > 0) {
+        return rate;
+      }
+      throw new Error(`No exchange rate found for ${baseCurrency} to ${targetCurrency}`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+/**
+ * Fetches an exchange rate, using ECB rates via Frankfurter when available and
+ * falling back to a broader source for currencies the ECB doesn't cover.
+ */
+async function fetchRate(baseCurrency: string, date?: string): Promise<number> {
+  const targetCurrency = getTargetCurrency();
+
+  // Same currency is always 1:1
+  if (baseCurrency === targetCurrency) {
+    return 1;
+  }
+
+  try {
+    return await fetchFrankfurterRate(baseCurrency, targetCurrency, date);
+  } catch {
+    return await fetchFallbackRate(baseCurrency, targetCurrency, date);
+  }
 }
 
 /**
@@ -73,15 +121,27 @@ export async function fetchExchangeRates(
       const rate = await fetchRate(currency, date);
       return { currency, rate };
     } catch (error) {
-      console.warn(`Warning: Could not fetch rate for ${currency}, using 1:1`);
-      return { currency, rate: 1 };
+      return { currency, rate: null };
     }
   });
   
   const results = await Promise.all(ratePromises);
+  const missing: string[] = [];
   
   for (const { currency, rate } of results) {
-    rates.set(currency, rate);
+    if (rate === null) {
+      missing.push(currency);
+    } else {
+      rates.set(currency, rate);
+    }
+  }
+  
+  if (missing.length > 0) {
+    // Never assume 1:1 — that silently inflates totals (e.g. 47 TWD shown as 47 SGD).
+    console.warn(
+      `Warning: Could not fetch rates for ${missing.join(", ")}. ` +
+      `Proceeds in ${missing.length === 1 ? "this currency" : "these currencies"} are EXCLUDED from totals.`
+    );
   }
   
   return rates;
@@ -98,7 +158,8 @@ export function convertToTargetCurrency(
     let total = 0;
     
     for (const [currency, amount] of Object.entries(app.proceedsByCurrency)) {
-      const rate = exchangeRates.get(currency) || 1;
+      const rate = exchangeRates.get(currency);
+      if (rate === undefined) continue;
       total += amount * rate;
     }
     
