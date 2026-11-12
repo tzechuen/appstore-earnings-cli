@@ -28,20 +28,21 @@ Converting currencies to USD...
 
   Earnings for September 2025
 
-├── My Awesome App                          $128.45
-│   ├── Pro Upgrade                          $89.99
-│   ├── Premium Features                     $28.50
-│   └── Remove Ads                            $9.96
-│
-├── Photo Editor Pro                         $67.22
-│   ├── Monthly Subscription                 $45.00
-│   └── Yearly Subscription                  $22.22
-│
-└── Simple Utility                           $12.99
-    └── (App Sales)                          $12.99
+  App / Product                            Items       Total
+  ──────────────────────────────────────────────────────────
+  My Awesome App                                     $128.45
+  ├─ Pro Upgrade                          $89.99
+  ├─ Premium Features                     $28.50
+  └─ Remove Ads                            $9.96
 
-─────────────────────────────────────────────────────
-                                  TOTAL      $208.66
+  Photo Editor Pro                                    $67.22
+  ├─ Monthly Subscription                 $45.00
+  └─ Yearly Subscription                  $22.22
+
+  Simple Utility                                      $12.99
+  └─ (App Sales)                          $12.99
+  ──────────────────────────────────────────────────────────
+  TOTAL                                              $208.66
 
   Payment Status: Paid (estimated)
   Payment Date: ~Oct 5, 2025

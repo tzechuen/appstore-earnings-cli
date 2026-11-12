@@ -406,67 +406,73 @@ function groupByParentApp(
   return Array.from(appMap.values());
 }
 
+// Terminal styling (disabled when piped or NO_COLOR is set)
+const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+const dim = (text: string) => (useColor ? `\x1b[2m${text}\x1b[22m` : text);
+const bold = (text: string) => (useColor ? `\x1b[1m${text}\x1b[22m` : text);
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? text.substring(0, max - 3) + "..." : text;
+}
+
+// Column widths for the earnings tree
+const NAME_WIDTH = 36;
+const ITEMS_WIDTH = 10;
+const TOTAL_WIDTH = 12;
+const TREE_WIDTH = NAME_WIDTH + ITEMS_WIDTH + TOTAL_WIDTH;
+
 /**
  * Displays earnings in a tree format with apps and their IAPs.
+ *
+ * Line items sit in an inner "Items" column (dimmed); only app totals sit in
+ * the right-hand "Total" column, which is the column that sums to TOTAL.
  */
 function displayEarningsTree(apps: AppWithIAPs[], month: CalendarMonth, paymentInfo: PaymentInfo | null): void {
   console.log(`\n  Earnings for ${month.displayName}\n`);
 
+  const rule = "  " + "─".repeat(TREE_WIDTH);
+
+  console.log(
+    dim(`  ${"App / Product".padEnd(NAME_WIDTH)}${"Items".padStart(ITEMS_WIDTH)}${"Total".padStart(TOTAL_WIDTH)}`)
+  );
+  console.log(rule);
+
   let grandTotal = 0;
 
-  for (let i = 0; i < apps.length; i++) {
-    const app = apps[i];
-    const isLastApp = i === apps.length - 1;
-
+  apps.forEach((app, i) => {
     grandTotal += app.totalProceeds;
 
-    // App header with tree branch
-    const appPrefix = isLastApp ? "└── " : "├── ";
-    const truncatedTitle = app.title.length > 32
-      ? app.title.substring(0, 29) + "..."
-      : app.title;
-
+    // App row: name spans into the (empty) items column, amount in the total column
+    const appTitle = truncate(app.title, NAME_WIDTH + ITEMS_WIDTH - 2);
     console.log(
-      `${appPrefix}${truncatedTitle.padEnd(35)} ${formatCurrency(app.totalProceeds).padStart(12)}`
+      `  ${bold(appTitle.padEnd(NAME_WIDTH + ITEMS_WIDTH))}${bold(formatCurrency(app.totalProceeds).padStart(TOTAL_WIDTH))}`
     );
 
-    // Show IAPs under the app
-    const childPrefix = isLastApp ? "    " : "│   ";
-
-    // If app has direct sales, show it
+    const items: { title: string; amount: number }[] = [];
     if (app.appProceeds > 0) {
-      const hasIAPs = app.iaps.length > 0;
-      const directBranch = hasIAPs ? "├── " : "└── ";
+      items.push({ title: "(App Sales)", amount: app.appProceeds });
+    }
+    for (const iap of app.iaps) {
+      items.push({ title: iap.title, amount: iap.totalProceeds });
+    }
+
+    items.forEach((item, j) => {
+      const branch = j === items.length - 1 ? "└─ " : "├─ ";
+      const title = truncate(item.title, NAME_WIDTH - branch.length - 1);
       console.log(
-        `${childPrefix}${directBranch}${"(App Sales)".padEnd(31)} ${formatCurrency(app.appProceeds).padStart(12)}`
+        dim(`  ${(branch + title).padEnd(NAME_WIDTH)}${formatCurrency(item.amount).padStart(ITEMS_WIDTH)}`)
       );
+    });
+
+    if (i < apps.length - 1) {
+      console.log("");
     }
+  });
 
-    // Show IAPs
-    for (let j = 0; j < app.iaps.length; j++) {
-      const iap = app.iaps[j];
-      const isLastIAP = j === app.iaps.length - 1;
-      const iapBranch = isLastIAP ? "└── " : "├── ";
-
-      const iapTitle = iap.title.length > 28
-        ? iap.title.substring(0, 25) + "..."
-        : iap.title;
-
-      console.log(
-        `${childPrefix}${iapBranch}${iapTitle.padEnd(31)} ${formatCurrency(iap.totalProceeds).padStart(12)}`
-      );
-    }
-
-    // Add spacing between apps
-    if (!isLastApp) {
-      console.log("│");
-    }
-  }
-
-  // Print total
-  console.log("");
-  console.log("─".repeat(53));
-  console.log(`${"TOTAL".padStart(39)} ${formatCurrency(grandTotal).padStart(12)}`);
+  console.log(rule);
+  console.log(
+    bold(`  ${"TOTAL".padEnd(NAME_WIDTH + ITEMS_WIDTH)}${formatCurrency(grandTotal).padStart(TOTAL_WIDTH)}`)
+  );
 
   // Display payment info
   displayPaymentSummary(paymentInfo, grandTotal);
